@@ -1,0 +1,195 @@
+---
+title: "Project_tests"
+author: "Robert Martin-Short"
+date: "11/24/2017"
+output: html_document
+---
+
+
+Testing loading of dataset and use of regression on some variables
+
+```{r setup, include=FALSE}
+library(dplyr)
+
+#Read the dataset
+baseball_dat = read.table(file.choose(),header=TRUE)
+
+#Choose reponse variable
+extract_response_variable <- function(dataset,name) {
+  
+  if ( name %in% colnames(dataset)) {
+    
+    name <- as.character(name)
+    
+    #Get matrix of predictors
+    predictors <- dataset
+    predictors[name] <- NULL
+    
+    #Get response variable
+    response <- dataset[name]
+    
+    return(list(response,predictors))
+  }
+  
+  else {
+  
+    print(paste("Name ",name," not found in dataset",sep=''))
+    return(list(0L,0L))
+  }
+}
+
+#Make matices to store info about the the evolving models and their fitness values
+
+subsets <- extract_response_variable(baseball_dat,"salary")
+
+response <- log(subsets[[1]])
+predictors <- subsets[[2]]
+
+m <- length(predictors) #Get the number of predictors
+P <- as.integer(m*1.5) #number of samples of different predictors (generation size)
+iter <- 100 #number of generation iterations to carry out
+mutate_rate <- 1.0/(P*sqrt(m)) #mutation rate (should be about 1%)
+generation_1 <- matrix(0,P,m) # matrix of the factor choices (P rows, m cols)
+generation_2 <- matrix(0,P,m) #matrix of the improved factor choices
+fitness_values <- matrix(0,P,1) #matrix of the fitness values for one generation
+fitness_evolution <- matrix(0,P,iter) #evolution of the fitness values over model run
+best_fitness <- 0 #best fitness value 
+best_fitness_generation = rep(0,iter) #evolution of best fitness values
+
+
+#Starting generation : generate P random combinations of the factors, do the regression and record their fitness values
+
+for (i in 1:P){
+  
+  #Geneate a vector of 1s and 0s corresponding to which predictors we want to use
+  generation_1[i,] <- rbinom(m,1,0.5)
+  
+  #Select the factors we want to use in the regression
+  run_vars <- predictors[,generation_1[i,]==1]
+  
+  #linear regression of the response variable against the predictor   #data
+  
+  # Note what this means
+  # lm( Y ~ A + B + C + D etc, data = run_vars)
+  # where A,B,C,D etc are the names of columns within the dataframe
+  # run_vars. The syntax here is just a more concise way or writing
+  # it
+  
+  g = lm(response[,1]~.,run_vars)
+  #g = glm(response[,1]~.,family=gaussian,data=run_vars)
+  fitness_value <- extractAIC(g)[2]
+  fitness_values[i,] <- fitness_value
+  fitness_evolution[i,1] <- fitness_value
+  
+  if (fitness_value < best_fitness){
+    best_fitness <- fitness_value
+    best_set <- generation_1[i,]
+  }
+  
+} 
+
+#rank the fitness values in order of goodness and record the indices
+#of that order
+ordered_fitness <- rank(-fitness_values)
+
+#Probability of selecting from a generation - proportional to the
+#fitness of the individals
+phi <- 2*ordered_fitness/(P*(P+1))
+best_fitness_generation[1] <- best_fitness
+
+#Main loop 
+
+for (i in 1:(iter-1)){
+  
+  #Do the crossover and mutation stage
+  
+  for (j in 1:(P/2)){
+    
+    parent_1 = generation_1[sample(1:P,1,prob=phi),]
+    
+    #Choose parent 2 at random
+		#parent_2 = generation_1[sample(1:P,1),]
+		
+		#Choose parent 2 with prob (seems to work better)
+		parent_2 = generation_1[sample(1:P,1,prob=phi),]
+		
+		#What if parents 1 and 2 are the same? 
+		
+		#select split position
+		pos = sample(1:(m-1),1)
+		
+		#make mutation vector
+		mutate = rbinom(m,1,mutate_rate)
+		
+		#concatinate the two parent vectors
+		generation_2[j,] = c(parent_1[1:pos],parent_2[(pos+1):m])
+		
+		#do the mutation - this will ensure that if a 2 is produced, 
+		#set to zero. If not, keeps as 1.
+		
+		generation_2[j,] = (generation_2[j,]+mutate)%%2
+		
+		#Do another pairing (forwards and backwards pairing, using the same parents)
+		mutate = rbinom(m,1,mutate_rate)
+		generation_2[P+1-j,] = c(parent_2[1:pos],parent_1[(pos+1):m])
+		generation_2[P+1-j,] = (generation_2[P+1-j,]+mutate)%%2
+    
+    
+  }
+  
+  generation_1 <- generation_2
+  
+  #Fill the generation matrices and update fitness
+  
+  for (j in 1:P){
+  
+  #Select the factors we want to use in the regression
+  run_vars <- predictors[,generation_1[j,]==1]
+  
+  #linear regression of the response variable against the predictor   #data
+  
+  g = lm(response[,1]~.,run_vars)
+  #g = glm(response[,1]~.,family=gaussian,data=run_vars)
+  fitness_value <- extractAIC(g)[2]
+  fitness_values[j,] <- fitness_value
+  fitness_evolution[j,i+1] <- fitness_value
+  
+  if (fitness_value < best_fitness){
+    best_fitness <- fitness_value
+    #The individual that has the highest fitness value
+    best_set <- generation_1[j,]
+  }
+  #rank the fitness values in order of goodness and record the indices
+  #of that order
+  ordered_fitness <- rank(-fitness_values)
+  #look into what this statitic does
+  phi <- 2*ordered_fitness/(P*(P+1))
+  best_fitness_generation[i+1] <- best_fitness
+  
+  } 
+  
+  #print the highest fitness and the correspondong parameter set
+  print (best_fitness)
+  print (best_set)
+  
+}
+  
+#Note that fitness evolution is a matrix with rows corresponding to the P individials in each generation and columns 
+#corresponding to the 
+plot(-fitness_evolution,xlim=c(0,iter),ylim=c(50,425),type="n",ylab="Negative AIC",
+	xlab="Generation",main="AIC Values For Genetic Algorithm")
+for(i in 1:iter){points(rep(i,P),-fitness_evolution[,i],pch=20)}
+
+```
+
+Test the reults
+
+```{r}
+library('hydroGOF')
+#Actually select the features of interest
+run_vars <- predictors[,best_set==1]
+predicted_response <- predict(g)
+#Get the rms error in terms of the actual salary
+root_mean_square_error <- rmse(exp(response),exp(predicted_response))
+print(root_mean_square_error)
+```

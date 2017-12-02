@@ -75,28 +75,26 @@ subsets <- extract_response_variable(baseball_dat,"salary")
 response <- log(subsets[[1]])
 predictors <- subsets[[2]]
 
-
-m <- length(predictors) #Get the number of predictors
-P <- as.integer(m*1.5) #number of samples of different predictors (generation size)
-iter <- 100 #number of generation iterations to carry out
-mutate_rate <- 1.0/(P*sqrt(m)) #mutation rate (should be about 1%)
-generation_1 <- matrix(0,P,m) # matrix of the factor choices (P rows, m cols)
-generation_2 <- matrix(0,P,m) #matrix of the improved factor choices
-fitness_values <- matrix(0,P,1) #matrix of the fitness values for one generation
-fitness_evolution <- matrix(0,P,iter) #evolution of the fitness values over model run
-best_fitness <- 0 #best fitness value 
-best_fitness_generation = rep(0,iter) #evolution of best fitness values
+# define key variables a priori
+C <- length(predictors) #Get the number of predictors
+P <- as.integer(m*1.5) #number of individuals in a given generation
+Ngen <- 100 #number of generation iterations to carry out
+mutate_rate <- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%)
+generation_old <- matrix(0,P,C) # matrix of the factor choices (P rows, m cols)
+generation_new <- matrix(0,P,C) #matrix of the improved factor choices
+fitness <- matrix(0,P,Ngen) #evolution of the fitness values over model run
+# best_fitness <- 0 #best fitness value 
+best_fitness_generation = rep(0,Ngen) #evolution of best fitness values
 
 
 #Starting generation : generate P random combinations of the factors, do the regression and record their fitness values
-
 for (i in 1:P){
   
   #Geneate a vector of 1s and 0s corresponding to which predictors we want to use
-  generation_1[i,] <- rbinom(m,1,0.5)
+  generation_old[i,] <- rbinom(m,1,0.5)
   
   #Select the factors we want to use in the regression
-  run_vars <- predictors[,generation_1[i,]==1]
+  predictors_chosen <- predictors[, generation_old[i,]==1]
   
   #linear regression of the response variable against the predictor   #data
   
@@ -106,20 +104,28 @@ for (i in 1:P){
   # run_vars. The syntax here is just a more concise way or writing
   # it
   
-  g = lm(response[,1]~.,run_vars)
+  model.out = lm(response[,1]~., predictors_chosen)
   #g = glm(response[,1]~.,family=gaussian,data=run_vars)
-  fitness_value <- fitness_function(g,userfunc = testuserfunc)
-  fitness_values[i,] <- fitness_value
-  fitness_evolution[i,1] <- fitness_value
-  
-  if (fitness_value < best_fitness){
-    best_fitness <- fitness_value
-    best_set <- generation_1[i,]
-  }
-  
+  fitness[i,1] <- fitness_function(model.out, userfunc = testuserfunc)
 } 
 
-print(fitness_value)
+# examine initial fitness (debugging)
+print(fitness[,1])
+
+for (n in 1:Ngen) { #loop through fixed number of iterations
+   # 1) produce P new children
+      # a) rank parents and generate probability of reproduction
+      # b) select 2 parents based on multinomial probability from above 
+      # c) randomly select genetic material from first parent using binomial with p = 0.5
+      # d) get alleles for all non-chosen genes from second parent
+      # e) create child
+      # f) mutate child
+      # g) repeat P times
+  # 2) Create new generation
+      # a) rank children and take top X percent
+      # b) replace worst X percent of parents with best X percent of children
+  # 3) Assess fitness of new generation
+}
 
 #Some other notes:
 

@@ -80,8 +80,8 @@ C <- length(predictors) #Get the number of predictors
 P <- as.integer(m*1.5) #number of individuals in a given generation
 Ngen <- 100 #number of generation iterations to carry out
 mutate_rate <- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%)
-parents <- matrix(0,P,C) # matrix of the factor choices (P rows, m cols)
-children <- matrix(0,P,C) #matrix of the improved factor choices
+generation_old <- matrix(0,P,C) # matrix of the factor choices (P rows, m cols)
+generation_new <- matrix(0,P,C) #matrix of the improved factor choices
 fitness <- matrix(0,P,Ngen) #evolution of the fitness values over model run
 # best_fitness <- 0 #best fitness value 
 best_fitness_generation = rep(0,Ngen) #evolution of best fitness values
@@ -91,10 +91,10 @@ best_fitness_generation = rep(0,Ngen) #evolution of best fitness values
 for (i in 1:P){
   
   #Geneate a vector of 1s and 0s corresponding to which predictors we want to use
-  parents[i,] <- rbinom(m,1,0.5)
+  generation_old[i,] <- rbinom(m,1,0.5)
   
   #Select the factors we want to use in the regression
-  predictors_chosen <- predictors[, parents[i,]==1]
+  predictors_chosen <- predictors[, generation_old[i,]==1]
   
   #linear regression of the response variable against the predictor   #data
   
@@ -119,7 +119,8 @@ for (n in 1:Ngen) { #loop through fixed number of iterations
       # c) randomly select genetic material from first parent using binomial with p = 0.5
       # d) get alleles for all non-chosen genes from second parent
       # e) create child
-      # f) repeat P times
+      # f) mutate child
+      # g) repeat P times
   # 2) Create new generation
       # a) rank children and take top X percent
       # b) replace worst X percent of parents with best X percent of children

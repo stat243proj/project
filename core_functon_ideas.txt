@@ -1,0 +1,81 @@
+
+** We already have a function for this
+
+Core functions
+
+> Extract_predictors_and_response() **
+
+- Takes an input dataframe and name of the response variable, returns a dataframe of 
+predictors and a dataframe of the response variable
+
+> Set_up_data_structures()
+
+- Allocate the data structures that we need to fill:
+   Parents - matrix of individials in 1st generation
+   Children - matrix of individuals in 2nd generation
+   Parents_fitness - vector of fitness values for parents
+   Children_fitness - vector of fitness values for children
+   Best_fitness_generation - vector of the best fitness value in each generation
+   Best_fitness - scalar that keeps track of the best overall fitness
+
+- This could be part of the initialize function in a RefClass object, if we decide to use this
+
+> Generate_first_generation() 
+
+- Loop over total number of desired individuals, create a random selection of the predictor variables, do the lm or glm fitting, determine fitness and fill relevent data structures
+
+> Cross_over_mutate()
+
+- Takes two individuals (from the parents matrix) and applies crossover and mutation. Returns one child, to be inserted into the childen matrix
+
+> Assess_generation()
+
+- Takes a matrix of individials in a generation (e.g. parents or children), does the lm or glm fitting, determines fitness and fills the relevent data structures. These can then be ranked by fitness. Returns the generation matrix ordered by fitness
+
+> Concatinate_generations()
+
+- Takes the ordered parent and children generation matrices (output from Assess_generation) and concatinatines them as desired (best 80% of parents + best 20% of chuldren or something like this). Retuns a new matrix (generation 2) and a vector of ordered fitness 
+
+> Apply_fitnes_function() ** 
+
+- Takes ooutput from lm or glm and applies a user defined (or default) fitness function. Returns the fitness value
+
+=============================================================
+
+A pseudocode applying these functions might be as follows:
+
+
+(parents,parent_fitness) <- Generate_first_generation(...)
+
+ordered_fitness <- rank(parent_fitness)
+phi <- 2*ordered_fitness/(P*(P+1)) #probability of being chosen
+Best_fitness_generation[1] <- max(ordered_fitness)
+
+##### Main loop ##### (maybe this should also be a function)
+
+for j = 1:iteration_count {
+	
+	for i = 1:length(parents){
+
+	    choose parent1 and parent2 using sample with probabilty phi
+
+	    child <- cross_over_mutate(parent1,parent2)
+
+	    Append child to children matrix
+
+	}
+
+	parents <- Assess_generation(parents)
+	children <- Assess_generation(children)
+
+	(children,ordered_fitness) <- concatinate_generations(parents,children)
+
+	phi <- 2*ordered_fitness/(P*(P+1)) #probability of being chosen
+	Best_fitness_generation[j] <- max(ordered_fitness)
+
+}
+
+Final output of the program is the member of the children matrix that has the highesr fitness
+
+
+

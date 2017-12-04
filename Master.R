@@ -77,7 +77,7 @@ predictors <- subsets[[2]]
 
 # define key variables a priori
 C <- length(predictors) #Get the number of predictors
-P <- as.integer(m*1.5) #number of individuals in a given generation
+P <- as.integer(C*1.5) #number of individuals in a given generation
 Ngen <- 100 #number of generation iterations to carry out
 mutate_rate <- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%)
 generation_old <- matrix(0,P,C) # matrix of the factor choices (P rows, m cols)
@@ -91,7 +91,7 @@ best_fitness_generation = rep(0,Ngen) #evolution of best fitness values
 for (i in 1:P){
   
   #Geneate a vector of 1s and 0s corresponding to which predictors we want to use
-  generation_old[i,] <- rbinom(m,1,0.5)
+  generation_old[i,] <- rbinom(C,1,0.5)
   
   #Select the factors we want to use in the regression
   predictors_chosen <- predictors[, generation_old[i,]==1]

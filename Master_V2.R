@@ -124,9 +124,12 @@ CrossOverMutate <- function(generation, parent.index, prob.mutate){
   #The generic material is chosen at random using sample
   parent1 <- generation[[parent.index[1]]]
   parent2 <- generation[[parent.index[2]]]
+  
   child <- parent1 
+  #generate locations of genetic information to swap
   pos <- sample(1:length(parent2),as.integer(length(parent2)/2),replace=FALSE)
   child[pos] <- parent2[pos]
+  
   #generate mutation vector
   mutate = rbinom(length(child),1,prob.mutate)
   #do the mutation - this will ensure that if a 2 is produced, 
@@ -214,7 +217,10 @@ for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
                     
 # get fit for 'best' individual at end
 generation.new <- generation.old
+
+#faster way of getting the best index than using which 
 best.index <- order(fitness[,Niter])[1]
+
 best.individual <- generation.new[[best.index]]
 print(best.individual)
 predictors.individual <- predictors[,best.individual==1]

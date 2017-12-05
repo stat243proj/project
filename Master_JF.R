@@ -86,6 +86,8 @@ Breed <- function(generation, fitness.vec, predictors, prob.mute) {
   # fitness.vec is a vector
   prob.reproduction <- 2*rank(-fitness.vec)/(P*(P+1))
   parent.index.list <- lapply(1:P, function(x) sample(P, 2, prob = prob.reproduction))
+                              
+  #Replace mate with cross_over_mutate from RMS code 
   children <- lapply(parent.index.list, function(x) Mate(generation, x, prob.mute))
   
   # return P children to be considered for selection
@@ -121,6 +123,8 @@ Mate <- function(generation, parent.index, prob.mute) {
 # MAIN PROGRAM
 # -------------------------------------------------------------------
 
+## Put all this in a function that can be called by user on the dataset
+                     
 # Define response and predictor variables
 subsets <- ExtractResponseVariable(baseball.dat,"salary")
 
@@ -134,28 +138,36 @@ if (flag.log.scale) {
 predictors <- subsets[[2]]
 
 # Define/create key variables a priori
-C <- length(predictors) #Get the number of predictors (GLOBAL)
-P <- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
-Ngen <- 100 #number of generation iterations to carry out (GLOBAL)
-mutation.rate <- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%) Formula suggested by G&H
-generation.old <- matrix(0,P,C) # matrix of the factor choices (P rows, m cols)
-generation.new <- matrix(0,P,C) #matrix of the improved factor choices
-fitness <- matrix(0,P,Ngen) #evolution of the fitness values over model run
-frac.replace <- 0.2 # % of individuals in child/adult population selected/replaced
+C <<- length(predictors) #Get the number of predictors (GLOBAL)
+P <<- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
+Ngen <<- 100 #number of generation iterations to carry out (GLOBAL)
+mutation.rate <<- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%) Formula suggested by G&H
+
+                     
+fitness <<- matrix(0,P,Ngen) #evolution of the fitness values over model run
+frac.replace <<- 0.2 # % of individuals in child/adult population selected/replaced
 
 # Define first generation (without FOR loops, lists are preferred)
 generation.old <- lapply(1:P, function(x) {rbinom(C,1,0.5)}) # list of individual genomes
+                     
+#assess fitness of the first generation                     
 fitness[,1] <- sapply(generation.old, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
 
 
 # -------------------------------------------------------------------
 # MAIN LOOP for genetic algorithm
+# put this in a loop function 
 # Loop through generations and apply selective forces to create iterative generations
 start <- Sys.time()
-for (n in seq_len(Ngen-1)) { #loop through fixed number of iterations
+                     
+for (n in 1:(Ngen-1)) { #loop through fixed number of iterations
   
   # breed selection of P children and assess their fitness
   children <- Breed(generation.old, fitness[,n], predictors, mutation.rate)
+  generation.new <- children
+  
+  ## simplify so that we replace parents with children without combining the generations (for now)
+  
   children.fitness <- sapply(children, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
   children.best.index <- which(rank(-children.fitness)>round((1-frac.replace)*P)) # select best children to keep
   children.best <- children[children.best.index] # vector length = # of adults to be replaced
@@ -173,6 +185,12 @@ print(stop-start)
 
 # -------------------------------------------------------------------
 # Plot up envelope of fitness values
+                     
+# plot the fitness matrix to see how the entire population evolves over time             
+                 
+                     
+## Improve the plotting
+                     
 fit.min <- apply(fitness, min, MARGIN = 2)
 fit.max <- apply(fitness, max, MARGIN = 2)
 x.gen <- seq_len(Ngen)

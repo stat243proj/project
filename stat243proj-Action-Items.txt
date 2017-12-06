@@ -1,3 +1,11 @@
+SPECIFIC TASKS (as of 10am, 12/5)
+**Start testing on baseball.dat and mtcars in R
+1) Jim -> remove the clones
+2) Robert -> look into making R package
+3) Shan -> testing two children 
+4) Echo -> try tournament style competition
+5) Fiona -> test algorithm with non-Gaussian GLM, modify user input GLM 'family'
+
 USER EXPERIENCE/AESTHETICS
 1) being able to submit fitness function (alternate criteria?)
 2) control mutation rate

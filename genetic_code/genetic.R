@@ -2,9 +2,6 @@
 #Robert modifications 12/4 
 
 
-#Read the dataset
-#baseball.dat = read.table(file.choose(),header=TRUE)
-
 # -------------------------------------------------------------------
 # PRE-DEFINE FUNCTIONS BEFORE MAIN CODE
 # -------------------------------------------------------------------
@@ -140,91 +137,129 @@ CrossOverMutate <- function(generation, parent.index, prob.mutate){
 }
 
 
-# -------------------------------------------------------------------
-# MAIN PROGRAM
-# -------------------------------------------------------------------
-
-## Put all this in a function that can be called by user on the dataset
-                     
-# Define response and predictor variables
-subsets <- ExtractResponseVariable(baseball.dat,"salary")
-
-# Choose to scale or reject bad data based on boolean flag
-flag.log.scale <- 1 
-if (flag.log.scale) {
-  response <- log(subsets[[1]])
-} else {
-  response <- subsets[[1]]
+ExtractBestIndividual <- function(generation,fitnessmatrix){
+  
+  #Extract the best individual and its corresponding fitness, and print a set of 
+  #summary statistics
+  
+  best.index <- order(fitnessmatrix[,Niter])[1]
+  
+  best.individual <- generation[[best.index]]
+  print(best.individual)
+  predictors.individual <- predictors[,best.individual==1]
+  model.out <- lm(response[,1]~., predictors.individual)
+  print(summary(model.out))
+  
 }
-predictors <- subsets[[2]]
 
-# Define/create key variables a priori
-C <- length(predictors) #Get the number of predictors (GLOBAL)
-P <- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
-Niter <- 100 #number of generation iterations to carry out (GLOBAL)
-prob.mutate <- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%) Formula suggested by G&H
-
-                     
-fitness <- matrix(0,P,Niter) #evolution of the fitness values over model run
-frac.replace <- 0.2 # % of individuals in child/adult population selected/replaced
-
-# Define first generation (without FOR loops, lists are preferred)
-generation.old <- lapply(1:P, function(x) {rbinom(C,1,0.5)}) # list of individual genomes
-                     
-#assess fitness of the first generation                     
-fitness[,1] <- sapply(generation.old, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
-
-
-# -------------------------------------------------------------------
-# MAIN LOOP for genetic algorithm
-# put this in a loop function 
-# Loop through generations and apply selective forces to create iterative generations
-start <- Sys.time()
-                     
-for (n in 1:(Niter-1)) { #loop through fixed number of iterations
+GeneticAlgorithmFit <- function(dataset,fitnessfunc=FALSE,flag.log.scale=TRUE,frac.replace=0.2,Niter=100,mutate.rate=FALSE){
   
-  # breed selection of P children and assess their fitness
-  children <- Breed(generation.old, fitness[,n], predictors, prob.mutate)
-  #generation.new <- children
+  #User can define a fitnessfunction, log scale flag, fraction of children to replace with parents, number of iterations and a mutation rate. If these are not provided they are set to dafault
   
-  ## simplify so that we replace parents with children without combining the generations (for now)
+  # Define response and predictor variables
+  subsets <- ExtractResponseVariable(baseball.dat,"salary")
   
-  children.fitness <- sapply(children, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
+  # Choose to scale or reject bad data based on boolean flag
   
-  #children.best.index <- which(rank(-children.fitness)>round((1-frac.replace)*P)) # select best children to keep
-  #children.best <- children[children.best.index] # vector length = # of adults to be replaced
-  #children.fitness.best <- children.fitness[children.best.index] # vector length = # of adults to be replaced
-
-  # now create new generation
-  #generation.old.worst.index <- which(rank(-fitness[,n])<=round(frac.replace*P)) # select worst parent by rank
+  if (flag.log.scale == TRUE) {
+    response <<- log(subsets[[1]])
+  } else {
+    response <<- subsets[[1]]
+  }
+  predictors <<- subsets[[2]]
   
-  generation.old <- children # keep most of prior generation
-  fitness[,n+1] <- children.fitness # keep most of prior generation fitness data
-  print(min(children.fitness))
-
+  # Define/create key variables a priori
+  # These variables are accessible to all genalg functions
+  
+  C <- length(predictors) #Get the number of predictors (GLOBAL)
+  Niter <<- Niter #number of iterations
+  P <<- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
+  
+  #Set the mutation rate
+  if (mutate.rate == FALSE) {
+    prob.mutate <<- 1.0/(P*sqrt(C)) #mutation rate (should be about 1%) Formula suggested by G&H
+  }
+  else {
+    prob.mutate <<- mutate.rate
+  }
+  
+  fitness <<- matrix(0,P,Niter) #evolution of the fitness values over model run
+  
+  # Define first generation 
+  generation.old <<- lapply(1:P, function(x) {rbinom(C,1,0.5)}) # list of individual genomes
+  
+  #assess fitness of the first generation                     
+  fitness[,1] <<- sapply(generation.old, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
+  
+  # -------------------------------------------------------------------
+  # MAIN LOOP for genetic algorithm
+  # Loop through generations and apply selective forces to create iterative generations
+  
+  start <- Sys.time()
+  
+  for (n in 1:(Niter-1)) { #Niter -1 because we've already made the first generation
+    
+    # breed selection of P children and assess their fitness
+    children <- Breed(generation.old, fitness[,n], predictors, prob.mutate)
+    
+    children.fitness <- sapply(children, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
+    
+    number.children.keep <- round((1-frac.replace)*P)
+    number.parents.keep <- P - number.children.keep
+    
+    #If we do want to keep parents in the new generation, then figure out the parents that we want to 
+    #keep. Otherwise, just replace all the parents with the children. 
+    
+    if (number.parents.keep > 1){
+      
+      parents.fitness <- sapply(generation.old, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
+    
+      children.best.index <- order(children.fitness)[1:number.children.keep] # select best children to keep
+      children.best <- children[children.best.index] # select the children to keep
+      children.fitness.best <- children.fitness[children.best.index] # select fitness of best children 
+    
+      parents.best.index <- order(parents.fitness)[1:number.parents.keep] # get indices of best parents 
+      parents.best <- generation.old[parents.best.index] # select the parents to keep 
+      parents.fitness.best <- parents.fitness[parents.best.index] # select the fitness of the best parents
+    
+      #Create nre generation and new generation fitness by concatinating the vectors we made
+      generation.new.fitness <- c(children.fitness.best,parents.fitness.best)
+      generation.new <- c(children.best,parents.best)
+    }
+    
+    else{
+      generation.new <- children
+      generation.new.fitness <- children.fitness
+    }
+    
+    #generation.old.worst.index <- which(rank(-fitness[,n])<=round(frac.replace*P)) # select worst parent by rank
+    
+    generation.old <<- generation.new # keep most of prior generation
+    fitness[,n+1] <<- generation.new.fitness # keep most of prior generation fitness data
+    print(min(generation.new.fitness))
+    
+  }
+  stop <- Sys.time()
+  print(stop-start)
+  
+  ExtractBestIndividual(generation.old,fitness)
+  
+  # -------------------------------------------------------------------
+  # Plot up envelope of fitness values
+  
+  plot(-fitness,xlim=c(0,Niter),ylim=c(50,425),type="n",ylab="Negative AIC",
+       xlab="Generation",main="AIC Values For Genetic Algorithm")
+  for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
+  
 }
-stop <- Sys.time()
-print(stop-start)
 
-# -------------------------------------------------------------------
-# Plot up envelope of fitness values
-          
-plot(-fitness,xlim=c(0,Niter),ylim=c(50,425),type="n",ylab="Negative AIC",
-     xlab="Generation",main="AIC Values For Genetic Algorithm")
-for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
-           
-# plot the fitness matrix to see how the entire population evolves over time             
+### A test
+
+#Read the dataset
+baseball.dat = read.table(file.choose(),header=TRUE)
+#Run the algorithm 
+GeneticAlgorithmFit(baseball.dat,Niter = 60,frac.replace = 0.2,mutate.rate = 0.05)
                  
-                    
-# get fit for 'best' individual at end
-generation.new <- generation.old
+                  
 
-#faster way of getting the best index than using which 
-best.index <- order(fitness[,Niter])[1]
 
-best.individual <- generation.new[[best.index]]
-print(best.individual)
-predictors.individual <- predictors[,best.individual==1]
-model.out <- lm(response[,1]~., predictors.individual)
-
-summary(model.out)

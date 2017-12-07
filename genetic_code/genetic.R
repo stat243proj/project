@@ -76,12 +76,14 @@ AssessFitness <- function(individual, response, user.family="gaussian", predicto
   predictors.individual <- predictors[,individual==1]
   
   #Check distribution family of glm()
-  if(!user.family %in% c("binomial", "gaussian", "Gamma", "poisson", "inverse.gaussian")){
-    print(paste("WARNING: User defined distribution family ", user.family, " is not existed", sep=''))
-    fitness.value = NULL
+  if(!user.family %in% c("binomial", "gaussian", "gamma", "poisson", "inverse.gaussian")){
+    print(paste("WARNING: User defined distribution family ", user.family, " does not exist", sep=''))
+    stop()
+    geterrmessage()
   }
   else{
     model.out <- glm(response[,1]~., family=user.family, predictors.individual)
+    #model.out <- lm(response[,1]~., predictors.individual)
     fitness.value <- FitnessFunction(model.out, userfunc)
   }
   return(fitness.value)
@@ -177,15 +179,16 @@ ExtractBestIndividual <- function(generation, fitnessmatrix){
   predictors.individual <- predictors[,best.individual==1]
   best.model <- lm(response[,1]~., predictors.individual)
   print(summary(best.model))
+  print(best.individual)
   return(best.model)
 }
 
 
 # -------------------------------------------------------------------
 #MAIN FUNCTION TO APPLY GENETIC ALGORITHM
-GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.family="gaussian", flag.log.scale=TRUE, frac.replace=0.2, Niter=100, mutate.rate=FALSE){
+GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.family="gaussian", flag.log.scale=TRUE, frac.replace=0.2, Niter=100, mutate.rate=FALSE, plot=TRUE){
   
-  #User can define a fitnessfunction, log scale flag, fraction of children to replace with parents, number of iterations and a mutation rate. If these are not provided they are set to dafault
+  #User can define a fitness function, log scale flag, fraction of children to replace with parents, number of iterations and a mutation rate. If these are not provided they are set to dafault
   
   # Define response and predictor variables
   subsets <- ExtractResponseVariable(dataset, response.name)
@@ -232,14 +235,17 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
     
     # breed selection of P children and assess their fitness
     children <- Breed(generation.old, fitness[,n], predictors, prob.mutate)
+    
     #Now, children is a list of length 20, and each element in the list is a data frame
-    #containing two coliumns. Each columns is a child.
-    #The following rwo lines are just converting children into a list of length 40. 
-    #And, each elemetn in the list is a child.
+    #containing two columns. Each columns is a child.
+    
+    #The following two lines are just converting children into a list of length 40. 
+    #And, each element in the list is a child.
     children <- cbind(sapply(children,"[[", 1), sapply(children,"[[", 2))
     children <- lapply(seq_len(ncol(children)), function(i) children[,i])
-    #Reason why I convert varaiable children into a list of length 40 is that I want 
-    #to make sure data structure of children is the same as before, so varaiable children
+    
+    #Reason why we convert varaiable children into a list of length 40 is that we want 
+    #to make sure data structure of children is the same as before, so variable children
     #is able to be applied in every function.
     
     children.fitness <- sapply(children, AssessFitness, response = response, user.family, predictors = predictors, userfunc)
@@ -286,12 +292,16 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
   
   best.model <- ExtractBestIndividual(generation.old,fitness)
   
-  # -------------------------------------------------------------------
-  # Plot up envelope of fitness values
   
-  plot(-fitness,xlim=c(0,Niter),ylim=c(min(-fitness), max(-fitness)),type="n",ylab="Negative AIC",
-       xlab="Generation",main="AIC Values For Genetic Algorithm")
+  #If user wants to plot the evolution of the population over time, do so
+  
+  if (plot == TRUE) {
+
+  plot(-fitness,xlim=c(0,Niter),ylim=c(min(-fitness), max(-fitness)),type="n",ylab="Negative fitness value",
+       xlab="Generation",main="Fitness values For Genetic Algorithm")
   for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
+  }
+  
   
   # show run time
   cat("Algorithm runtime: ", round(as.numeric(stop-start),2), " seconds")
@@ -303,15 +313,13 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
   
 }
 
-### A test
-
 #Read the dataset
-baseball = read.table("baseball.dat",header=TRUE)
+baseball = read.table(file.choose(),header=TRUE)
 #Run the algorithm 
-GeneticAlgorithmFit(dataset=baseball, response.name="salary", 
+out <- GeneticAlgorithmFit(dataset=baseball, response.name="salary", 
                              userfunc=FALSE, user.family="gaussian", 
                              flag.log.scale=TRUE,
-                             Niter = 100, frac.replace = 0.2, mutate.rate = FALSE)
+                             Niter = 50, frac.replace = 0.2, mutate.rate = 0.005)
   
   
 

@@ -76,13 +76,13 @@ AssessFitness <- function(individual, response, user.family="gaussian", predicto
   predictors.individual <- predictors[,individual==1]
   
   #Check distribution family of glm()
-  if(!user.family %in% c("binomial", "gaussian", "gamma", "poisson", "inverse.gaussian")){
+  if(!user.family %in% c("binomial", "gaussian", "Gamma", "poisson", "inverse.gaussian")){
     print(paste("WARNING: User defined distribution family ", user.family, " does not exist", sep=''))
     stop()
     geterrmessage()
   }
   else{
-    model.out <- glm(response[,1]~., family=user.family, predictors.individual)
+    model.out <- glm(response[,1]~., family=user.family, data=predictors.individual)
     #model.out <- lm(response[,1]~., predictors.individual)
     fitness.value <- FitnessFunction(model.out, userfunc)
   }
@@ -156,7 +156,7 @@ ReplaceClones <- function(generation, fitness.vec, C) {
   replacements <- lapply(1:N.clones, function(x) {rbinom(C,1,0.5)}) # list of new individual genomes
   generation[clone.index] <- replacements
   # the followin is to avoid computing fitness for the majority of non-clones
-  fitness.replacements <- sapply(replacements, AssessFitness, response = response, predictors = predictors, userfunc = FALSE)
+  fitness.replacements <- sapply(replacements, AssessFitness, response = response, user.family, predictors = predictors, userfunc)
   dim(fitness.replacements)
   fitness.vec[clone.index] <- fitness.replacements
   output <- list("generation" = generation, "fitness" = fitness.vec)

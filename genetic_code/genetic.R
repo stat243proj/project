@@ -156,7 +156,7 @@ ReplaceClones <- function(generation, fitness.vec, C) {
   replacements <- lapply(1:N.clones, function(x) {rbinom(C,1,0.5)}) # list of new individual genomes
   generation[clone.index] <- replacements
   # the followin is to avoid computing fitness for the majority of non-clones
-  fitness.replacements <- sapply(replacements, AssessFitness, response = response, user.family, predictors = predictors, userfunc)
+  fitness.replacements <- sapply(replacements, AssessFitness, response = response, predictors = predictors)
   dim(fitness.replacements)
   fitness.vec[clone.index] <- fitness.replacements
   output <- list("generation" = generation, "fitness" = fitness.vec)

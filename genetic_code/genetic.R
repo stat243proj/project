@@ -1,10 +1,22 @@
-#CHANGES: Kexin Fei, Shan Gao, Yachen Wang by 6:00 pm on Dec 6
+#CHANGES: Jim Falter by 5pm on F Dec 8
+# 1) changed default input to "AIC" for FitnessFunction()
+# 2) minor editing to clean up comments
+# 3) removed code at end 'testing' algorithm.  Should now be done outside of code.
+# 4) Changed Breed() so it always generates P children so main code doesn't have to adjust
+# 5) Changed FitnessFunction() so it either uses default AIC or user submitted
+#    function which it firsts tests is a function object and returns error otherwise
+# 6) Changed AssessFitness() and GeneticAlgorithmFit() so defulat userfunc="AIC" to
+#    be submitted to downstream functions.
+# 7) Replaced 'plot' variable with 'plot.flag' since plot() is a common R function
+#    This is used to decide whether we want to show intermediate output
+# 8) Changed name of main function to Select()
+
 
 # -------------------------------------------------------------------
 # PRE-DEFINE FUNCTIONS BEFORE MAIN CODE
 
 # -------------------------------------------------------------------
-# ExtractResponseVariable
+# ExtractResponseVariable()
 # function to get separate response variable from predictors
 ExtractResponseVariable <- function(dataset,name) {
 
@@ -36,39 +48,40 @@ ExtractResponseVariable <- function(dataset,name) {
 
 
 # -------------------------------------------------------------------
-# FitnessFunction
-#Evaluate the fitness of some model, output from lm or glm
-#The userfunc should take a fitted model and output a scalar
-#fitness value
+# FitnessFunction()
+# Evaluate the fitness of some model, output from lm or glm
+# based on three choices of fitness function
+# 1) Aikake Information Crieter  or "AIC" (default)
+# 2) Bayesian Information Criteria or "BIC"
+# 3) Residual sum of squares or "Residual"
 
-FitnessFunction <- function(model, userfunc=FALSE){
-
-  if (userfunc == FALSE) {
+FitnessFunction <- function(model, userfunc){
+  
+  if (userfunc == "AIC") { # default case of Aikake Info Criteria
+    
     fitness.value <- extractAIC(model)[2]
+    return(fitness.value)
+    
+  } else {
+    if (class(userfunc) == "function") { # test if submitted function is a function object
+      
+      userfunc(model)
+      return(fitness.value) 
+      
+    } else {
+      print(paste0("WARNING: ", deparse(substitute(unserfunc)), "() is not a recognized function"))
+    }
   }
-
-  else if (userfunc == "Residual"){
-    fitness.value <- sum(model$residuals^2)
-  }
-
-  else if(userfunc == "BIC"){
-    fitness.value <- BIC(model)
-  }
-  else{
-    print(paste("WARNING: User Fitness Function ", userfunc, " cannot be calculated", sep=''))
-    fitness.value = NULL
-  }
-  return(fitness.value)
 }
 
 
 # -------------------------------------------------------------------
-# AssessFitness
+# AssessFitness()
 # function that determines 'fitness' of an invidivudal based on the quality
 # of the LS fit. The default for determining fitness is the Aikake Criteria Index
 # but the user can supply their own custom-made fitness function
 # **may be worth it to treat 'predictors' as global variable or object
-AssessFitness <- function(individual, response, user.family="gaussian", predictors, userfunc=FALSE){
+AssessFitness <- function(individual, response, user.family="gaussian", predictors, userfunc="AIC"){
 
   #Evaluate the fitness of some model, output from glm
   #The userfunc should take a fitted model and output a scalar fitness value
@@ -94,11 +107,13 @@ AssessFitness <- function(individual, response, user.family="gaussian", predicto
     #model.out <- lm(response[,1]~., predictors.individual)
     fitness.value <- FitnessFunction(model.out, userfunc)
   }
+  
   return(fitness.value)
 }
 
+
 # -------------------------------------------------------------------
-# Breed
+# Breed()
 # Function that breeds P new children based on parents' genome and fitness
 
 Breed <- function(generation, fitness.vec, predictors, prob.mutate) {
@@ -106,49 +121,51 @@ Breed <- function(generation, fitness.vec, predictors, prob.mutate) {
   # generation is a list with each element containing the genome of an individual
   # fitness.vec is a vector
   prob.reproduction <- 2*rank(-fitness.vec)/(P*(P+1))
-  parent.index.list <- lapply(1:(P/2), function(x) sample(P,2,prob = prob.reproduction,replace=FALSE))
+  parent.index.list <- lapply(1:P, function(x) sample(P,2,prob = prob.reproduction,replace=FALSE))
 
-  children <- lapply(parent.index.list, function(x) CrossOverMutate(generation, x, prob.mutate))
-
-  # return P children to be considered for selection
-  # also return fitness evaluation
+  child.pairs <- lapply(parent.index.list, function(x) CrossOverMutate(generation, x, prob.mutate))
+  # collate list of P child pairs into a single generation (list) of P children
+  children <- unlist(child.pairs, recursive = FALSE)[1:P/2]
+  # children <- lapply(child.pairs, function(x) x[[1]])
 
   return(children)
 }
 
-# -------------------------------------------------------------------
-# CrossOverMutate
-# Function that produces a single child from two chosen parents
-# and allows for the possibility of mutation
-CrossOverMutate <- function(generation, parent.index, prob.mutate){
 
-  #Create child individual with half of its genetic material from parent1 and the other half from parent2
-  #The generic material is chosen at random using sample
+# -------------------------------------------------------------------
+# CrossOverMutate()
+# Function that produces two children with mirroring genomes from two chosen parents
+# and simultaneously allows for the possibility for random mutation
+CrossOverMutate <- function(generation, parent.index, prob.mutate=0.005){
+
+  # Create child individual with half of its genetic material from parent1 and the other half from parent2
+  # The generic material is chosen at random using sample
   parent1 <- generation[[parent.index[1]]]
   parent2 <- generation[[parent.index[2]]]
-
   child1 <- parent1
   child2 <- parent2
-  #generate locations of genetic information to swap
+  
+  # generate locations of genetic information to swap
   pos <- sample(1:length(parent2),as.integer(length(parent2)/2),replace=FALSE)
   child1[pos] <- parent2[pos]
   child2[pos] <- parent1[pos]
 
-  #generate mutation vector
+  # generate mutation vector
   mutate1 = rbinom(length(child1),1,prob.mutate)
   mutate2 = rbinom(length(child2),1,prob.mutate)
-  #do the mutation - this will ensure that if a 2 is produced,
-  #set to zero. If not, keeps as 1.
+  
+  # do the mutation - this will ensure that if a 2 is produced,
+  # set to zero. If not, keeps as 1.
   child1 = (child1+mutate1)%%2
   child2 = (child2+mutate2)%%2
-  child = data.frame(child1, child2)
+  child.pair = list(child1, child2)
 
-  return(child)
+  return(child.pair)
 }
 
 
 # -------------------------------------------------------------------
-# RemoveClones
+# RemoveClones()
 # function that removes any clones from a given generation and replaces them
 # with individuals randomly created from the entire genome clones are predicted
 # to exist when fitness of two individuals are exactly the same
@@ -172,11 +189,12 @@ ReplaceClones <- function(generation, fitness.vec, C) {
   return(output)
 }
 
+
 # -------------------------------------------------------------------
-# ExtractBestIndividual
+# ExtractBestIndividual()
 # Function that extracts the best individual and its corresponding fitness, and prints a set of
 # summary statistics
-ExtractBestIndividual <- function(generation, fitnessmatrix){
+ExtractBestIndividual <- function(generation, fitnessmatrix, plot.flag=FALSE){
 
   #Extract the best individual and its corresponding fitness, and print a set of
   #summary statistics
@@ -184,18 +202,20 @@ ExtractBestIndividual <- function(generation, fitnessmatrix){
   best.index <- order(fitnessmatrix[,Niter])[1]
 
   best.individual <- generation[[best.index]]
-  print(best.individual)
   predictors.individual <- predictors[,best.individual==1]
   best.model <- lm(response[,1]~., predictors.individual)
-  print(summary(best.model))
-  print(best.individual)
+  if (plot.flag == TRUE) {
+    print(summary(best.model))
+    print(best.individual)
+  }
   return(best.model)
 }
 
 
 # -------------------------------------------------------------------
-#MAIN FUNCTION TO APPLY GENETIC ALGORITHM
-GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.family="gaussian", flag.log.scale=TRUE, frac.replace=0.2, Niter=100, mutate.rate=FALSE, plot=TRUE){
+#MAIN FUNCTION() TO APPLY GENETIC ALGORITHM
+Select <- function(dataset, response.name, userfunc="AIC", user.family="gaussian", flag.log.scale=TRUE, 
+                                frac.replace=0.2, Niter=100, mutate.rate=FALSE, plot.flag=TRUE){
 
   #User can define a fitness function, log scale flag, fraction of children to replace with parents, number of iterations and a mutation rate. If these are not provided they are set to dafault
 
@@ -216,7 +236,8 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
 
   C <- length(predictors) #Get the number of predictors (GLOBAL)
   Niter <<- Niter #number of iterations
-  P <<- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
+  P <- as.integer(C*1.5) #number of individuals in a given generation (GLOBAL)
+  P <<- 2*ceiling(P/2) # Force P to be even due to a future need to 'split' a generation in two
 
   #Set the mutation rate
   if (mutate.rate == FALSE) {
@@ -245,25 +266,12 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
     # breed selection of P children and assess their fitness
     children <- Breed(generation.old, fitness[,n], predictors, prob.mutate)
 
-    #Now, children is a list of length 20, and each element in the list is a data frame
-    #containing two columns. Each columns is a child.
-
-    #The following two lines are just converting children into a list of length 40.
-    #And, each element in the list is a child.
-    children <- cbind(sapply(children,"[[", 1), sapply(children,"[[", 2))
-    children <- lapply(seq_len(ncol(children)), function(i) children[,i])
-
-    #Reason why we convert varaiable children into a list of length 40 is that we want
-    #to make sure data structure of children is the same as before, so variable children
-    #is able to be applied in every function.
-
     children.fitness <- sapply(children, AssessFitness, response = response, user.family, predictors = predictors, userfunc)
-
     number.children.keep <- round((1-frac.replace)*P)
     number.parents.keep <- P - number.children.keep
 
-    #If we do want to keep parents in the new generation, then figure out the parents that we want to
-    #keep. Otherwise, just replace all the parents with the children.
+    # If we do want to keep parents in the new generation, then figure out the parents that we want to
+    # keep. Otherwise, just replace all the parents with the children.
     if (number.parents.keep > 1){
 
       parents.fitness <- sapply(generation.old, AssessFitness, response = response, user.family, predictors = predictors, userfunc)
@@ -294,26 +302,26 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
     #generation.old.worst.index <- which(rank(-fitness[,n])<=round(frac.replace*P)) # select worst parent by rank
     generation.old <- generation.new # keep most of prior generation
     fitness[,n+1] <- generation.new.fitness # keep most of prior generation fitness data
-    print(min(generation.new.fitness))
 
   }
   stop <- Sys.time()
 
-  best.model <- ExtractBestIndividual(generation.old,fitness)
+  best.model <- ExtractBestIndividual(generation.old,fitness, plot.flag)
 
 
   #If user wants to plot the evolution of the population over time, do so
 
-  if (plot == TRUE) {
-
-  plot(-fitness,xlim=c(0,Niter),ylim=c(min(-fitness), max(-fitness)),type="n",ylab="Negative fitness value",
-       xlab="Generation",main="Fitness values For Genetic Algorithm")
-  for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
+  if (plot.flag == TRUE) {
+    
+    print(min(generation.new.fitness))
+    plot(-fitness,xlim=c(0,Niter),ylim=c(min(fitness), max(fitness)),type="n",ylab="Negative fitness value",
+         xlab="Generation",main="Fitness values For Genetic Algorithm")
+    for(i in 1:Niter){points(rep(i,P),-fitness[,i],pch=20)}
   }
 
 
   # show run time
-  cat("Algorithm runtime: ", round(as.numeric(stop-start),2), " seconds")
+  cat("Algorithm runtime: ", round(as.numeric(stop-start),2), " seconds\n")
   # print(stop-start)
 
   # RETURN OUTPUT VARIABLES
@@ -321,16 +329,6 @@ GeneticAlgorithmFit <- function(dataset, response.name, userfunc=FALSE, user.fam
   return(output)
 
 }
-
-#Read the dataset
-baseball = read.table(file.choose(),header=TRUE)
-
-dataset <- mtcars
-out <- GeneticAlgorithmFit(dataset=dataset, response.name="mpg",
-                             userfunc=FALSE, user.family="gaussian",
-                             flag.log.scale=TRUE,
-                             Niter = 50, frac.replace = 0.2, mutate.rate = 0.005,plot=TRUE)
-
 
 
 
